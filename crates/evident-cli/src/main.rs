@@ -1,3 +1,5 @@
+mod git;
+
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
@@ -6,7 +8,7 @@ use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
 use chrono::Utc;
 use clap::{Parser, Subcommand};
 use evident_audit::chain::{self, AuditEntry};
-use evident_audit::evidence::{AuditRef, EvidencePack, SignerInfo, TsaInfo};
+use evident_audit::evidence::{AuditRef, EvidencePack, GitInfo, SignerInfo, TsaInfo};
 use evident_crypto::file_signer::{parse_signature, parse_verifying_key, verify_evidence};
 use evident_crypto::hash;
 use evident_crypto::key_store;
@@ -34,6 +36,8 @@ enum Commands {
         file: PathBuf,
         #[arg(long)]
         no_tsa: bool,
+        #[arg(long)]
+        git: bool,
     },
     Verify {
         file: PathBuf,
@@ -116,7 +120,7 @@ fn run() -> Result<u8> {
         Commands::Key { command } => match command {
             KeyCommands::Init => cmd_key_init(cli.json),
         },
-        Commands::Seal { file, no_tsa } => cmd_seal(&file, no_tsa, cli.json),
+        Commands::Seal { file, no_tsa, git } => cmd_seal(&file, no_tsa, git, cli.json),
         Commands::Verify { file, proof } => cmd_verify(&file, proof.as_deref(), cli.json),
         Commands::Audit { command } => match command {
             AuditCommands::Log => cmd_audit_log(cli.json),
@@ -164,10 +168,23 @@ fn cmd_key_init(json: bool) -> Result<u8> {
     Ok(0)
 }
 
-fn cmd_seal(file: &Path, no_tsa: bool, json: bool) -> Result<u8> {
+fn cmd_seal(file: &Path, no_tsa: bool, git: bool, json: bool) -> Result<u8> {
     if !file.exists() {
         return Err(anyhow!("file not found: {}", file.display()));
     }
+
+    let git_info = if git {
+        Some(GitInfo {
+            commit: git::git_commit().unwrap_or_default(),
+            branch: git::git_branch().unwrap_or_default(),
+            tag: None,
+            dirty: git::git_dirty(),
+            repo: git::git_remote(),
+            ci: git::detect_ci(),
+        })
+    } else {
+        None
+    };
 
     let file_hash = hash::sha256_file(file)?;
     let file_hash_hex = hex::encode(file_hash);
@@ -228,6 +245,7 @@ fn cmd_seal(file: &Path, no_tsa: bool, json: bool) -> Result<u8> {
             seq: audit_seq,
             chain_hash: audit_chain_hash,
         },
+        git: git_info.clone(),
     };
 
     let proof_path = file.with_extension("evident");
@@ -246,6 +264,17 @@ fn cmd_seal(file: &Path, no_tsa: bool, json: bool) -> Result<u8> {
         println!("SEALED: {}", proof_path.display());
         println!("TSA:    {tsa_line}");
         println!("seq:    {audit_seq}");
+        if let Some(ref g) = pack.git {
+            let commit = &g.commit;
+            let short = if commit.len() > 8 {
+                &commit[..8]
+            } else {
+                commit.as_str()
+            };
+            let dirty = if g.dirty { " dirty" } else { "" };
+
+            println!("GIT:    {} {}{}", short, g.branch, dirty);
+        }
     }
 
     Ok(0)
@@ -310,6 +339,26 @@ fn cmd_verify(file: &Path, proof: Option<&Path>, json: bool) -> Result<u8> {
         println!("[--]   TSA:            {tsa_line}");
         println!("[--]   Sealed at:      {}", pack.sealed_at);
         println!("[--]   Signer:         {signer_prefix}");
+        if let Some(ref g) = pack.git {
+            let commit = &g.commit;
+            let short = if commit.len() > 8 {
+                &commit[..8]
+            } else {
+                commit.as_str()
+            };
+            let dirty = if g.dirty { " dirty" } else { "" };
+
+            println!("[--]   Git commit:     {short}{dirty}");
+            println!("[--]   Branch:         {}", g.branch);
+
+            if let Some(ref ci) = g.ci {
+                println!(
+                    "[--]   CI:             {} run={}",
+                    ci.provider,
+                    ci.run_id.as_deref().unwrap_or("?")
+                );
+            }
+        }
     }
 
     if file_ok && sig_ok {

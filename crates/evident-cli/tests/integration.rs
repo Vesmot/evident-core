@@ -60,6 +60,7 @@ fn round_trip_seal_and_verify() -> anyhow::Result<()> {
                 seq: audit_seq,
                 chain_hash: audit_chain_hash,
             },
+            git: None,
         };
 
         let proof_path = file_path.with_extension("evident");

@@ -4,6 +4,23 @@ use std::path::Path;
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct GitInfo {
+    pub commit: String,
+    pub branch: String,
+    pub tag: Option<String>,
+    pub dirty: bool,
+    pub repo: Option<String>,
+    pub ci: Option<CiInfo>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct CiInfo {
+    pub provider: String,
+    pub run_id: Option<String>,
+    pub workflow: Option<String>,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct EvidencePack {
     pub version: String,
@@ -14,6 +31,8 @@ pub struct EvidencePack {
     pub signer: SignerInfo,
     pub tsa: TsaInfo,
     pub audit: AuditRef,
+    #[serde(default)]
+    pub git: Option<GitInfo>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -56,5 +75,27 @@ impl EvidencePack {
             anyhow::bail!("unsupported evidence pack version: {}", pack.version);
         }
         Ok(pack)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::EvidencePack;
+
+    #[test]
+    fn deserializes_without_git_field() {
+        let json = r#"{
+            "version": "1",
+            "file_name": "test.txt",
+            "file_hash": "abc",
+            "sealed_at": "2026-06-26T10:00:00Z",
+            "sealed_at_unix": 1782477600,
+            "signer": { "public_key": "00", "signature": "00" },
+            "tsa": { "status": "skipped" },
+            "audit": { "seq": 1, "chain_hash": "00" }
+        }"#;
+
+        let pack: EvidencePack = serde_json::from_str(json).expect("parse legacy pack");
+        assert!(pack.git.is_none());
     }
 }
