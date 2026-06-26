@@ -55,7 +55,6 @@ enum Commands {
         #[arg(long)]
         report: bool,
     },
-    /// Журнал аудита
     #[command(about = "Журнал аудита")]
     Audit {
         #[command(subcommand)]
