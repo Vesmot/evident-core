@@ -1,32 +1,46 @@
-# If any cryptographic or audit invariant cannot be guaranteed deterministically, fail build.
+# Evident-Core
 
-## evident-core v0.1
+Evident-Core is a cryptographic CLI tool for file notarization.
 
-Secure evidence management: Ed25519 signatures, encrypted key vault, TSA anchoring, append-only audit chain.
+It provides:
+- Ed25519 digital signatures
+- Optional RFC3161 timestamping (TSA)
+- Append-only audit chain
+- Encrypted local key vault
 
-### Build
+## Components
+
+- **evident-cli** — command line interface
+- **evident-crypto** — cryptographic primitives (Ed25519, Argon2id, AES-256-GCM)
+- **evident-tsa** — RFC3161 timestamping layer with fallback
+- **evident-audit** — audit trail and evidence packaging
+
+## Quick Start
 
 ```bash
-cargo build --release
-```
+# Initialize key vault
+evident key init
 
-### Commands
+# Seal a file
+evident seal document.pdf
 
-- `evident key init` — create encrypted vault at `~/.evident/key.enc`
-- `evident seal <file> [--no-tsa]` — seal file, write `<file>.evident`
-- `evident verify <file> [--proof <path>]` — verify integrity and signature
-- `evident audit log` — show last 20 audit entries
-- `evident audit verify` — verify audit chain integrity
+# Verify integrity
+evident verify document.pdf
 
-All commands support `--json` for machine-readable output.
+# View audit log
+evident audit
+Status
+v0.1-stable — stable cryptographic baseline
 
-### Cryptographic invariants
+✅ Argon2id + AES-256-GCM vault with KDF parameters
 
-1. Signature covers `SHA256(domain || file_hash || sealed_at || pubkey)` with `domain = b"EVIDENT-v1"`
-2. `sealed_at`: RFC3339 UTC, second precision (`%Y-%m-%dT%H:%M:%SZ`)
-3. Audit chain independent of TSA failures
-4. TSA failure → `skipped`, not a hard error
-5. Hashes are `[u8;32]` internally, hex in JSON
-6. Vault stores seed `[u8;32]`, not SigningKey bytes
-7. No `key.pub` — public key derived from seed via PIN
-8. Verify uses public key from `.evident` file, PIN not required
+✅ Ed25519 signatures with verify_strict
+
+✅ RFC3161 TSA with automatic fallback
+
+✅ Append-only audit chain with file locking
+
+✅ Binary canonical format with Unix timestamp
+
+License
+MIT
