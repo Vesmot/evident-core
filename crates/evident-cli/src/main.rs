@@ -32,10 +32,12 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
+    #[command(about = "Управление ключевым vault")]
     Key {
         #[command(subcommand)]
         command: KeyCommands,
     },
+    #[command(about = "Зафиксировать файл")]
     Seal {
         file: PathBuf,
         #[arg(long)]
@@ -45,6 +47,7 @@ enum Commands {
         #[arg(long)]
         report: bool,
     },
+    #[command(about = "Верифицировать файл")]
     Verify {
         file: PathBuf,
         #[arg(long)]
@@ -52,6 +55,8 @@ enum Commands {
         #[arg(long)]
         report: bool,
     },
+    /// Журнал аудита
+    #[command(about = "Журнал аудита")]
     Audit {
         #[command(subcommand)]
         command: AuditCommands,
