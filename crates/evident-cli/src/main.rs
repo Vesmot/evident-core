@@ -17,7 +17,11 @@ use serde::Serialize;
 use zeroize::Zeroizing;
 
 #[derive(Parser)]
-#[command(name = "evident", about = "Evident evidence management CLI")]
+#[command(
+    name = "evident",
+    about = "Evident — криптографическая фиксация файлов",
+    version
+)]
 struct Cli {
     #[arg(long, global = true)]
     json: bool,
