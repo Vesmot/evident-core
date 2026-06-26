@@ -473,6 +473,7 @@ dependencies = [
  "base64",
  "chrono",
  "clap",
+ "dirs",
  "ed25519-dalek",
  "evident-audit",
  "evident-crypto",

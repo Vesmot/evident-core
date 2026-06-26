@@ -38,6 +38,8 @@ enum Commands {
         no_tsa: bool,
         #[arg(long)]
         git: bool,
+        #[arg(long)]
+        report: bool,
     },
     Verify {
         file: PathBuf,
@@ -120,7 +122,12 @@ fn run() -> Result<u8> {
         Commands::Key { command } => match command {
             KeyCommands::Init => cmd_key_init(cli.json),
         },
-        Commands::Seal { file, no_tsa, git } => cmd_seal(&file, no_tsa, git, cli.json),
+        Commands::Seal {
+            file,
+            no_tsa,
+            git,
+            report,
+        } => cmd_seal(&file, no_tsa, git, report, cli.json),
         Commands::Verify { file, proof } => cmd_verify(&file, proof.as_deref(), cli.json),
         Commands::Audit { command } => match command {
             AuditCommands::Log => cmd_audit_log(cli.json),
@@ -168,7 +175,7 @@ fn cmd_key_init(json: bool) -> Result<u8> {
     Ok(0)
 }
 
-fn cmd_seal(file: &Path, no_tsa: bool, git: bool, json: bool) -> Result<u8> {
+fn cmd_seal(file: &Path, no_tsa: bool, git: bool, report: bool, json: bool) -> Result<u8> {
     if !file.exists() {
         return Err(anyhow!("file not found: {}", file.display()));
     }
@@ -275,6 +282,10 @@ fn cmd_seal(file: &Path, no_tsa: bool, git: bool, json: bool) -> Result<u8> {
 
             println!("GIT:    {} {}{}", short, g.branch, dirty);
         }
+    }
+
+    if report {
+        print_report(&pack, &proof_path, file);
     }
 
     Ok(0)
@@ -474,4 +485,51 @@ fn format_tsa_status(status: &str, provider: Option<&str>) -> String {
     } else {
         "skipped".to_string()
     }
+}
+
+fn print_report(pack: &EvidencePack, proof_path: &Path, source_file: &Path) {
+    let hash_short = if pack.file_hash.len() >= 16 {
+        format!("{}...", &pack.file_hash[..16])
+    } else {
+        pack.file_hash.clone()
+    };
+
+    let tsa_line = match pack.tsa.status.as_str() {
+        "anchored" => format!(
+            "подтверждено ({})",
+            pack.tsa.provider.as_deref().unwrap_or("TSA")
+        ),
+        _ => "без TSA-метки".to_string(),
+    };
+
+    let signer_short = if pack.signer.public_key.len() >= 16 {
+        format!("{}...", &pack.signer.public_key[..16])
+    } else {
+        pack.signer.public_key.clone()
+    };
+
+    let source_path = source_file
+        .canonicalize()
+        .unwrap_or_else(|_| source_file.to_path_buf());
+
+    let audit_path = dirs::home_dir()
+        .unwrap_or_else(|| std::path::PathBuf::from("~"))
+        .join(".evident")
+        .join("audit.jsonl");
+
+    println!();
+    println!("═══════════════════════════════════════════════════");
+    println!("         СВИДЕТЕЛЬСТВО О КРИПТОЗАПИСИ              ");
+    println!("═══════════════════════════════════════════════════");
+    println!("Документ : {}", pack.file_name);
+    println!("Хэш      : {}", hash_short);
+    println!("Подписан : {}", pack.sealed_at);
+    println!("TSA      : {}", tsa_line);
+    println!("Ключ     : {}", signer_short);
+    println!("───────────────────────────────────────────────────");
+    println!("Исходник : {}", source_path.display());
+    println!("Подпись  : {}", proof_path.display());
+    println!("Журнал   : {}", audit_path.display());
+    println!("═══════════════════════════════════════════════════");
+    println!();
 }
