@@ -4,6 +4,8 @@ use std::time::Duration;
 use chrono::Utc;
 use reqwest::blocking::Client;
 
+use crate::ts_request::build_ts_request;
+
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum TsaStatus {
     Anchored,
@@ -72,7 +74,12 @@ pub fn seal_with_tsa(file_hash_bytes: &[u8; 32], url: &str) -> TsaResult {
             thread::sleep(Duration::from_millis(BACKOFF_MS[(attempt - 1) as usize]));
         }
 
-        match client.post(url).body(file_hash_bytes.to_vec()).send() {
+        match client
+            .post(url)
+            .header("Content-Type", "application/timestamp-query")
+            .body(build_ts_request(file_hash_bytes))
+            .send()
+        {
             Ok(response) => {
                 if !response.status().is_success() {
                     continue;

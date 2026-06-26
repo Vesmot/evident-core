@@ -1,6 +1,8 @@
 pub mod native;
+pub mod ts_request;
 
 pub use native::{seal_with_fallback, TsaResult, TsaStatus};
+pub use ts_request::build_ts_request;
 
 pub struct TsaConfig {
     pub urls: Vec<String>,
