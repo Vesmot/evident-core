@@ -27,12 +27,12 @@ TSA:    anchored (FreeTSA)
 seq:    1
 
 ═══════════════════════════════════════════════════
-         СВИДЕТЕЛЬСТВО О КРИПТОЗАПИСИ              
+         CRYPTOGRAPHIC SEAL CERTIFICATE              
 ═══════════════════════════════════════════════════
-Документ : document.pdf
-Хэш      : a1fff0ffefb9eace...
-Подписан : 2026-06-26T11:13:40Z
-TSA      : подтверждено (FreeTSA)
+Document : document.pdf
+Hash     : a1fff0ffefb9eace...
+Sealed at: 2026-06-26T11:13:40Z
+TSA      : verified (FreeTSA)
 ═══════════════════════════════════════════════════
 
 # Verify
@@ -42,7 +42,7 @@ $ evident verify document.pdf --report
 [--]   TSA:            anchored (FreeTSA)
 
 ═══════════════════════════════════════════════════
-Результат   : ЦЕЛОСТНОСТЬ ПОДТВЕРЖДЕНА
+Result      : INTEGRITY CONFIRMED
 ═══════════════════════════════════════════════════
 ```
 
