@@ -60,6 +60,10 @@ enum Commands {
         #[command(subcommand)]
         command: AuditCommands,
     },
+    #[command(about = "Show evidence file contents")]
+    Inspect {
+        proof: PathBuf,
+    },
 }
 
 #[derive(Subcommand)]
@@ -145,6 +149,7 @@ fn run() -> Result<u8> {
             AuditCommands::Log => cmd_audit_log(cli.json),
             AuditCommands::Verify => cmd_audit_verify(cli.json),
         },
+        Commands::Inspect { proof } => cmd_inspect(&proof, cli.json),
     }
 }
 
@@ -393,6 +398,36 @@ fn cmd_verify(file: &Path, proof: Option<&Path>, report: bool, json: bool) -> Re
     } else {
         Ok(1)
     }
+}
+
+fn cmd_inspect(proof: &Path, json: bool) -> Result<u8> {
+    let pack = EvidencePack::load(proof)?;
+
+    let tsa_status = match pack.tsa.status.as_str() {
+        "anchored" => format!(
+            "anchored ({})",
+            pack.tsa.provider.as_deref().unwrap_or("unknown")
+        ),
+        _ => "skipped".to_string(),
+    };
+
+    if json {
+        println!("{}", serde_json::to_string(&pack)?);
+    } else {
+        println!("File      : {}", pack.file_name);
+        println!("Hash      : {}", pack.file_hash);
+        println!("Sealed    : {}", pack.sealed_at);
+        println!("Signer    : {}", pack.signer.public_key);
+        println!("Signature : {}", pack.signer.signature);
+        println!("TSA       : {}", tsa_status);
+        println!("Audit seq : {}", pack.audit.seq);
+
+        if let Some(ref g) = pack.git {
+            println!("Git       : {} {}", g.commit, g.branch);
+        }
+    }
+
+    Ok(0)
 }
 
 fn cmd_audit_log(json: bool) -> Result<u8> {
