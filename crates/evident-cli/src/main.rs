@@ -194,7 +194,8 @@ fn cmd_key_init(json: bool) -> Result<u8> {
 
 fn cmd_seal(file: &Path, no_tsa: bool, git: bool, report: bool, json: bool) -> Result<u8> {
     if !file.exists() {
-        return Err(anyhow!("file not found: {}", file.display()));
+        eprintln!("error: file not found: {}", file.display());
+        return Ok(2);
     }
 
     let git_info = if git {
@@ -314,13 +315,17 @@ fn cmd_verify(file: &Path, proof: Option<&Path>, report: bool, json: bool) -> Re
         .unwrap_or_else(|| file.with_extension("evident"));
 
     if !file.exists() {
-        return Err(anyhow!("file not found: {}", file.display()));
+        eprintln!("error: file not found: {}", file.display());
+        return Ok(2);
     }
     if !proof_path.exists() {
-        return Err(anyhow!("proof not found: {}", proof_path.display()));
+        eprintln!("error: proof file not found: {}", proof_path.display());
+        return Ok(2);
     }
 
-    let pack = EvidencePack::load(&proof_path)?;
+    let pack = EvidencePack::load(&proof_path).map_err(|e| {
+        anyhow!("malformed evidence file: {e}")
+    })?;
     let file_hash = hash::sha256_file(file)?;
     let file_hash_hex = hex::encode(file_hash);
     let file_ok = file_hash_hex == pack.file_hash;
@@ -401,7 +406,14 @@ fn cmd_verify(file: &Path, proof: Option<&Path>, report: bool, json: bool) -> Re
 }
 
 fn cmd_inspect(proof: &Path, json: bool) -> Result<u8> {
-    let pack = EvidencePack::load(proof)?;
+    if !proof.exists() {
+        eprintln!("error: proof file not found: {}", proof.display());
+        return Ok(2);
+    }
+
+    let pack = EvidencePack::load(proof).map_err(|e| {
+        anyhow!("malformed evidence file: {e}")
+    })?;
 
     let tsa_status = match pack.tsa.status.as_str() {
         "anchored" => format!(
