@@ -11,6 +11,7 @@ path = "src/main.rs"
 evident-crypto = { path = "../evident-crypto" }
 evident-tsa = { path = "../evident-tsa" }
 evident-audit = { path = "../evident-audit" }
+evident-case = { path = "../evident-case" }
 anyhow = "1"
 clap = { version = "4", features = ["derive"] }
 rpassword = "7"

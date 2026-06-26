@@ -1,3 +1,4 @@
+mod case_cmd;
 mod git;
 
 use std::path::{Path, PathBuf};
@@ -64,6 +65,13 @@ enum Commands {
     Inspect {
         proof: PathBuf,
     },
+    #[command(about = "Case-isolated cryptographic audit")]
+    Case {
+        #[arg(long, help = "Case storage root (default: /var/lib/evident or EVIDENT_CASE_ROOT)")]
+        root: Option<PathBuf>,
+        #[command(subcommand)]
+        command: CaseCommands,
+    },
 }
 
 #[derive(Subcommand)]
@@ -75,6 +83,26 @@ enum KeyCommands {
 enum AuditCommands {
     Log,
     Verify,
+}
+
+#[derive(Subcommand)]
+enum CaseCommands {
+    #[command(about = "Create a new isolated case")]
+    Create {
+        case_id: String,
+    },
+    #[command(about = "Append an event to a case chain")]
+    Append {
+        case_id: String,
+        #[arg(long)]
+        r#type: String,
+        #[arg(long)]
+        data: Option<String>,
+    },
+    #[command(about = "Verify case hash chain and manifest signature")]
+    Verify {
+        case_id: String,
+    },
 }
 
 #[derive(Serialize)]
@@ -150,6 +178,35 @@ fn run() -> Result<u8> {
             AuditCommands::Verify => cmd_audit_verify(cli.json),
         },
         Commands::Inspect { proof } => cmd_inspect(&proof, cli.json),
+        Commands::Case { root, command } => {
+            let case_root = root.unwrap_or_else(case_cmd::default_case_root);
+            match command {
+                CaseCommands::Create { case_id } => {
+                    let pin = read_pin("Enter PIN: ")?;
+                    case_cmd::cmd_case_create(&case_id, &case_root, pin.as_slice(), cli.json)
+                }
+                CaseCommands::Append {
+                    case_id,
+                    r#type,
+                    data,
+                } => {
+                    let pin = read_pin("Enter PIN: ")?;
+                    let data = case_cmd::parse_data_json(data.as_deref())?;
+                    case_cmd::cmd_case_append(
+                        &case_id,
+                        &r#type,
+                        data,
+                        &case_root,
+                        pin.as_slice(),
+                        cli.json,
+                    )
+                }
+                CaseCommands::Verify { case_id } => {
+                    let pin = read_pin("Enter PIN: ")?;
+                    case_cmd::cmd_case_verify(&case_id, &case_root, pin.as_slice(), cli.json)
+                }
+            }
+        }
     }
 }
 

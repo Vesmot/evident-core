@@ -32,6 +32,10 @@ impl CaseChain {
     pub fn open(case_dir: &Path, case_id: &str) -> Result<Self> {
         fs::create_dir_all(case_dir.join("evidence"))?;
         let chain_path = case_dir.join("chain.jsonl");
+        if !chain_path.exists() {
+            File::create(&chain_path)
+                .with_context(|| format!("create {}", chain_path.display()))?;
+        }
         let last_hash = read_last_hash(&chain_path)?;
         Ok(Self {
             case_id: case_id.to_string(),
@@ -59,7 +63,7 @@ impl CaseChain {
         Ok(event)
     }
 
-    pub fn verify_chain(&self) -> Result<(bool, Option<usize>)> {
+    pub fn verify_chain(&self) -> Result<(bool, Option<u64>)> {
         if !self.chain_path.exists() {
             return Ok((true, None));
         }
@@ -69,7 +73,7 @@ impl CaseChain {
         let reader = BufReader::new(file);
 
         let mut expected_prev = CaseChainLinker::genesis_hash();
-        let mut index = 0usize;
+        let mut index = 0u64;
 
         for line in reader.lines() {
             let line = line?;
@@ -98,11 +102,11 @@ impl CaseChain {
     }
 
     pub fn event_count(&self) -> Result<usize> {
-        Ok(read_all_events(&self.chain_path)?.len())
+        Ok(self.read_events()?.len())
     }
 
     pub fn root_hash(&self) -> Result<String> {
-        let events = read_all_events(&self.chain_path)?;
+        let events = self.read_events()?;
         if let Some(first) = events.first() {
             Ok(first.current_hash.clone())
         } else {
@@ -112,6 +116,10 @@ impl CaseChain {
 
     pub fn chain_path(&self) -> &Path {
         &self.chain_path
+    }
+
+    pub fn read_events(&self) -> Result<Vec<CaseEvent>> {
+        read_all_events(&self.chain_path)
     }
 }
 
@@ -152,7 +160,10 @@ fn append_event_line(path: &Path, event: &CaseEvent) -> Result<()> {
         .ok_or_else(|| anyhow!("chain path has no parent"))?;
     fs::create_dir_all(parent)?;
 
-    let lock_path = parent.join(format!("{}.chain.lock", path.file_name().unwrap_or_default().to_string_lossy()));
+    let lock_path = parent.join(format!(
+        "{}.chain.lock",
+        path.file_name().unwrap_or_default().to_string_lossy()
+    ));
     let lock_file = OpenOptions::new()
         .create(true)
         .write(true)

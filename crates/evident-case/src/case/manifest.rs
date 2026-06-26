@@ -2,38 +2,31 @@ use std::fs;
 use std::path::Path;
 
 use anyhow::{Context, Result};
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use crate::audit::hash::{canonical_json_bytes, CaseChainLinker, ChainLinker};
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum ManifestStatus {
-    Valid,
-    Invalid,
-}
+pub const STATUS_VALID: &str = "VALID";
+pub const STATUS_INVALID: &str = "INVALID";
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Manifest {
     pub case_id: String,
     pub root_hash: String,
     pub last_hash: String,
-    pub status: ManifestStatus,
     pub event_count: u64,
-    pub created_at: DateTime<Utc>,
+    pub status: String,
 }
 
 impl Manifest {
-    pub fn new(case_id: &str) -> Self {
+    pub fn genesis(case_id: &str) -> Self {
         let genesis = CaseChainLinker::genesis_hash();
         Self {
             case_id: case_id.to_string(),
             root_hash: genesis.clone(),
             last_hash: genesis,
-            status: ManifestStatus::Valid,
             event_count: 0,
-            created_at: Utc::now(),
+            status: STATUS_VALID.to_string(),
         }
     }
 

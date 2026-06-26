@@ -493,6 +493,7 @@ dependencies = [
  "dirs",
  "ed25519-dalek",
  "evident-audit",
+ "evident-case",
  "evident-crypto",
  "evident-tsa",
  "hex",
