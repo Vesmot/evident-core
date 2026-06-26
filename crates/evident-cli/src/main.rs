@@ -45,6 +45,8 @@ enum Commands {
         file: PathBuf,
         #[arg(long)]
         proof: Option<PathBuf>,
+        #[arg(long)]
+        report: bool,
     },
     Audit {
         #[command(subcommand)]
@@ -128,7 +130,9 @@ fn run() -> Result<u8> {
             git,
             report,
         } => cmd_seal(&file, no_tsa, git, report, cli.json),
-        Commands::Verify { file, proof } => cmd_verify(&file, proof.as_deref(), cli.json),
+        Commands::Verify { file, proof, report } => {
+            cmd_verify(&file, proof.as_deref(), report, cli.json)
+        }
         Commands::Audit { command } => match command {
             AuditCommands::Log => cmd_audit_log(cli.json),
             AuditCommands::Verify => cmd_audit_verify(cli.json),
@@ -291,7 +295,7 @@ fn cmd_seal(file: &Path, no_tsa: bool, git: bool, report: bool, json: bool) -> R
     Ok(0)
 }
 
-fn cmd_verify(file: &Path, proof: Option<&Path>, json: bool) -> Result<u8> {
+fn cmd_verify(file: &Path, proof: Option<&Path>, report: bool, json: bool) -> Result<u8> {
     let proof_path = proof
         .map(PathBuf::from)
         .unwrap_or_else(|| file.with_extension("evident"));
@@ -370,6 +374,10 @@ fn cmd_verify(file: &Path, proof: Option<&Path>, json: bool) -> Result<u8> {
                 );
             }
         }
+    }
+
+    if report {
+        print_verify_report(&pack, file, &proof_path, file_ok, sig_ok);
     }
 
     if file_ok && sig_ok {
@@ -530,6 +538,83 @@ fn print_report(pack: &EvidencePack, proof_path: &Path, source_file: &Path) {
     println!("Исходник : {}", source_path.display());
     println!("Подпись  : {}", proof_path.display());
     println!("Журнал   : {}", audit_path.display());
+    println!("═══════════════════════════════════════════════════");
+    println!();
+}
+
+fn print_verify_report(
+    pack: &EvidencePack,
+    source_file: &Path,
+    proof_path: &Path,
+    file_ok: bool,
+    sig_ok: bool,
+) {
+    let overall_ok = file_ok && sig_ok;
+
+    let status_line = if overall_ok {
+        "ПОДТВЕРЖДЕНА"
+    } else {
+        "НАРУШЕНА"
+    };
+
+    let hash_short = if pack.file_hash.len() >= 16 {
+        format!("{}...", &pack.file_hash[..16])
+    } else {
+        pack.file_hash.clone()
+    };
+
+    let tsa_line = match pack.tsa.status.as_str() {
+        "anchored" => format!(
+            "подтверждено ({})",
+            pack.tsa.provider.as_deref().unwrap_or("TSA")
+        ),
+        _ => "без TSA-метки".to_string(),
+    };
+
+    let signer_short = if pack.signer.public_key.len() >= 16 {
+        format!("{}...", &pack.signer.public_key[..16])
+    } else {
+        pack.signer.public_key.clone()
+    };
+
+    let source_path = source_file
+        .canonicalize()
+        .unwrap_or_else(|_| source_file.to_path_buf());
+
+    println!();
+    println!("═══════════════════════════════════════════════════");
+    println!("         ВЕРИФИКАЦИЯ КРИПТОГРАФИЧЕСКОЙ ФИКСАЦИИ   ");
+    println!("═══════════════════════════════════════════════════");
+
+    println!("Документ   : {}", pack.file_name);
+    println!("Хэш        : {}", hash_short);
+    println!("Подписан   : {}", pack.sealed_at);
+    println!("TSA        : {}", tsa_line);
+    println!("Ключ       : {}", signer_short);
+
+    println!("───────────────────────────────────────────────────");
+
+    if overall_ok {
+        println!("Целостность : совпадает ✓");
+        println!("Подпись     : действительна ✓");
+    } else {
+        if !file_ok {
+            println!("Целостность : НАРУШЕНА ✗");
+        } else {
+            println!("Целостность : совпадает ✓");
+        }
+
+        if !sig_ok {
+            println!("Подпись     : НЕДЕЙСТВИТЕЛЬНА ✗");
+        }
+    }
+
+    println!("───────────────────────────────────────────────────");
+    println!("Исходник    : {}", source_path.display());
+    println!("Подпись     : {}", proof_path.display());
+    println!("───────────────────────────────────────────────────");
+    println!("Результат   : ЦЕЛОСТНОСТЬ {}", status_line);
+
     println!("═══════════════════════════════════════════════════");
     println!();
 }
